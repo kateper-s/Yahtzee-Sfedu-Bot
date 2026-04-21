@@ -30,12 +30,12 @@ RSpec.configure do |config|
     FactoryBot.find_definitions
   end
 
-  config.before(:each) do
+  config.before do
     DatabaseCleaner.strategy = :transaction
     DatabaseCleaner.start
   end
 
-  config.after(:each) do
+  config.after do
     DatabaseCleaner.clean
     Timecop.return
   end

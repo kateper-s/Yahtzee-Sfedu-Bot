@@ -18,7 +18,7 @@ RSpec.describe YahtzeeBot::Bot do
 
   describe '#initialize' do
     it 'initializes with token from ENV' do
-      expect(bot.instance_variable_get(:@token)).to eq(ENV['TELEGRAM_BOT_TOKEN'])
+      expect(bot.instance_variable_get(:@token)).to eq(ENV.fetch('TELEGRAM_BOT_TOKEN', nil))
     end
 
     it 'creates persistence instance' do
@@ -65,10 +65,10 @@ RSpec.describe YahtzeeBot::Bot do
     end
 
     it 'handles multiple messages concurrently' do
-      messages = 3.times.map { message }
+      messages = Array.new(3) { message }
       allow(telegram_bot).to receive(:listen).and_yield(messages[0])
-                                                .and_yield(messages[1])
-                                                .and_yield(messages[2])
+                                             .and_yield(messages[1])
+                                             .and_yield(messages[2])
 
       expect(YahtzeeBot::MessageHandler).to receive(:handle).exactly(3).times
 
@@ -147,7 +147,7 @@ RSpec.describe YahtzeeBot::Bot do
     it 'continues processing after error' do
       messages = [message, message]
       allow(telegram_bot).to receive(:listen).and_yield(messages[0])
-                                              .and_yield(messages[1])
+                                             .and_yield(messages[1])
 
       allow(YahtzeeBot::MessageHandler).to receive(:handle).and_raise(StandardError)
       allow(api).to receive(:send_message)
@@ -183,7 +183,7 @@ RSpec.describe YahtzeeBot::Bot do
       )
 
       allow(telegram_bot).to receive(:listen).and_yield(chat1_message)
-                                              .and_yield(chat2_message)
+                                             .and_yield(chat2_message)
 
       expect(persistence).to receive(:load_game).with(123_456)
       expect(persistence).to receive(:load_game).with(789_012)

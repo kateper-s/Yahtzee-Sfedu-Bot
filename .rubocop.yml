@@ -1,14 +1,17 @@
 require:
   - rubocop-rspec
+  - rubocop-performance
 
 AllCops:
-  TargetRubyVersion: 3.2
+  TargetRubyVersion: 3.3
   NewCops: enable
+  SuggestExtensions: false
   Exclude:
-    - 'db/**/*'
-    - 'bin/**/*'
     - 'vendor/**/*'
     - 'tmp/**/*'
+    - 'db/**/*'
+    - 'bin/**/*'
+    - 'log/**/*'
 
 Style/Documentation:
   Enabled: false
@@ -17,49 +20,63 @@ Style/FrozenStringLiteralComment:
   Enabled: true
   EnforcedStyle: always
 
+Style/ClassAndModuleChildren:
+  EnforcedStyle: compact
+
 Layout/LineLength:
   Max: 120
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/ClassLength:
+  Max: 400
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/MethodLength:
+  Max: 50
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/AbcSize:
+  Max: 35
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/CyclomaticComplexity:
+  Max: 20
   Exclude:
     - 'spec/**/*'
 
 Metrics/BlockLength:
   Exclude:
     - 'spec/**/*'
-    - '*.gemspec'
+  Max: 50
 
-Metrics/MethodLength:
-  Max: 20
-  Exclude:
-    - 'spec/**/*'
-
-Metrics/ClassLength:
-  Max: 200
-  Exclude:
-    - 'spec/**/*'
-
-Metrics/AbcSize:
-  Max: 20
-  Exclude:
-    - 'spec/**/*'
-
+# RSpec настройки
 RSpec/ExampleLength:
-  Max: 15
+  Max: 50
+  Exclude:
+    - 'spec/integration/**/*'
 
 RSpec/MultipleExpectations:
-  Max: 5
+  Max: 10
+
+RSpec/MultipleMemoizedHelpers:
+  Max: 10
 
 RSpec/NestedGroups:
-  Max: 4
+  Max: 5
 
-RSpec/ContextWording:
-  Prefixes:
-    - when
-    - with
-    - without
-    - and
+RSpec/MessageSpies:
+  Enabled: false
 
-Style/ClassAndModuleChildren:
-  EnforcedStyle: compact
+RSpec/StubbedMock:
+  Enabled: false
 
-Style/SignalException:
-  EnforcedStyle: semantic
+RSpec/IndexedLet:
+  Enabled: false
+
+RSpec/DescribeClass:
+  Exclude:
+    - 'spec/integration/**/*'

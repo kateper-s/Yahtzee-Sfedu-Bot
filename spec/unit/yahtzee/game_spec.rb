@@ -4,7 +4,7 @@ require 'spec_helper'
 
 RSpec.describe Yahtzee::Game do
   let(:chat_id) { 123_456 }
-  let(:game) { described_class.new(chat_id: chat_id) }
+  let(:game) { described_class.new(chat_id:) }
 
   describe '#initialize' do
     it 'creates a new game with waiting_for_players state' do

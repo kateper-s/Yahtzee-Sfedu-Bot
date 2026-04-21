@@ -20,7 +20,7 @@ RSpec.describe Yahtzee::Player do
     it 'initializes empty scores array' do
       expect(player.scores).to be_an(Array)
       expect(player.scores.size).to eq(17)
-      expect(player.scores.all? { |s| s == 0 }).to be true
+      expect(player.scores.all?(0)).to be true
     end
 
     it 'initializes empty used_categories' do
@@ -309,7 +309,7 @@ RSpec.describe Yahtzee::Player do
       expect(player.id).to eq(456)
       expect(player.name).to eq('Charlie')
       expect(player.scores).to eq(hash_data[:scores])
-      expect(player.used_categories).to match_array([1, 2, 3, 7, 13])
+      expect(player.used_categories).to contain_exactly(1, 2, 3, 7, 13)
       expect(player.total_score).to eq(76)
     end
 

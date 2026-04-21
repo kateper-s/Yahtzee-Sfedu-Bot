@@ -50,11 +50,11 @@ RSpec.describe Yahtzee::Dice do
       end
 
       it 'decrements rolls_left' do
-        expect { dice.roll }.to change { dice.rolls_left }.from(3).to(2)
+        expect { dice.roll }.to change(dice, :rolls_left).from(3).to(2)
       end
 
       it 'sets rolled? to true' do
-        expect { dice.roll }.to change { dice.rolled? }.from(false).to(true)
+        expect { dice.roll }.to change(dice, :rolled?).from(false).to(true)
       end
 
       it 'generates different values on subsequent rolls' do
@@ -117,7 +117,7 @@ RSpec.describe Yahtzee::Dice do
       end
 
       it 'decrements rolls_left' do
-        expect { dice.roll_positions([1, 2]) }.to change { dice.rolls_left }.by(-1)
+        expect { dice.roll_positions([1, 2]) }.to change(dice, :rolls_left).by(-1)
       end
 
       it 'returns false when dice not rolled yet' do
@@ -153,7 +153,7 @@ RSpec.describe Yahtzee::Dice do
 
       it 'handles string positions' do
         dice.roll_all
-        dice.roll_positions(['1', '2'])
+        dice.roll_positions(%w[1 2])
 
         expect(dice.rolls_left).to eq(2)
       end
@@ -177,7 +177,7 @@ RSpec.describe Yahtzee::Dice do
     end
 
     it 'decrements rolls_left' do
-      expect { dice.roll_all }.to change { dice.rolls_left }.by(-1)
+      expect { dice.roll_all }.to change(dice, :rolls_left).by(-1)
     end
 
     it 'returns false when no rolls left' do
@@ -208,7 +208,7 @@ RSpec.describe Yahtzee::Dice do
     end
 
     it 'resets rolls_left to max_rolls' do
-      expect { dice.reset }.to change { dice.rolls_left }.from(1).to(3)
+      expect { dice.reset }.to change(dice, :rolls_left).from(1).to(3)
     end
 
     it 'sets rolled? to false' do
@@ -356,7 +356,7 @@ RSpec.describe Yahtzee::Dice do
 
     it 'returns unique values' do
       dice.instance_variable_set(:@values, [1, 1, 2, 3, 3])
-      expect(dice.uniq_values).to match_array([1, 2, 3])
+      expect(dice.uniq_values).to contain_exactly(1, 2, 3)
     end
 
     it 'returns single value for all same' do
@@ -419,7 +419,7 @@ RSpec.describe Yahtzee::Dice do
         10_000.times do
           dice.reset
           dice.roll_all
-          dice.values.each { |v| frequencies[v] += 1 }
+          dice.each_value { |v| frequencies[v] += 1 }
         end
 
         # Каждое значение должно появляться примерно с одинаковой частотой
