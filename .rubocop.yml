@@ -13,6 +13,11 @@ AllCops:
     - 'bin/**/*'
     - 'log/**/*'
 
+# ВАЖНО: Только ОДИН раз и СТРОГО nested!
+Style/ClassAndModuleChildren:
+  EnforcedStyle: nested
+  Enabled: true
+
 Style/Documentation:
   Enabled: false
 
@@ -20,13 +25,14 @@ Style/FrozenStringLiteralComment:
   Enabled: true
   EnforcedStyle: always
 
-Style/ClassAndModuleChildren:
-  EnforcedStyle: compact
-
 Layout/LineLength:
   Max: 120
   Exclude:
     - 'spec/**/*'
+
+Layout/TrailingEmptyLines:
+  Enabled: true
+  EnforcedStyle: final_newline
 
 Metrics/ClassLength:
   Max: 400
