@@ -3,6 +3,7 @@
 require 'sequel'
 require 'json'
 require 'logger'
+require 'fileutils'
 require_relative 'game'
 
 module Yahtzee
@@ -37,8 +38,9 @@ module Yahtzee
       games_table.where(chat_id:).delete
     end
 
-    def save_player_stats(player_name, score, won: false)
+    def save_player_stats(user_id, player_name, score, won: false)
       player_stats_table.insert(
+        user_id:,
         player_name:,
         score:,
         won: won ? 1 : 0,
@@ -46,8 +48,8 @@ module Yahtzee
       )
     end
 
-    def get_player_stats(player_name)
-      stats = player_stats_table.where(player_name:)
+    def get_player_stats(user_id)
+      stats = player_stats_table.where(user_id:)
       {
         games_played: stats.count,
         average_score: stats.avg(:score).to_f.round(2),
@@ -58,7 +60,8 @@ module Yahtzee
 
     def get_leaderboard(limit = 10)
       player_stats_table
-        .select_group(:player_name)
+        .select_group(:user_id)
+        .select_append { max(:player_name).as(:player_name) }
         .select_append { avg(score).as(:avg_score) }
         .select_append { count(:id).as(:games) }
         .select_append { sum(:won).as(:wins) }
@@ -86,6 +89,7 @@ module Yahtzee
         DateTime :updated_at, default: Sequel::CURRENT_TIMESTAMP
       end
 
+      # Безопасное добавление индекса (исправление ошибки)
       existing_index = @db.indexes(:games).values.any? { |idx| idx[:columns] == [:chat_id] }
       unless existing_index
         @db.add_index :games, :chat_id, unique: true
@@ -93,10 +97,18 @@ module Yahtzee
 
       @db.create_table? :player_stats do
         primary_key :id
+        Integer :user_id # Telegram ID пользователя
         String :player_name, null: false
         Integer :score, null: false
         Integer :won, default: 0
         DateTime :played_at, default: Sequel::CURRENT_TIMESTAMP
+      end
+
+      # Миграция: добавить колонку user_id, если её нет (для старых БД)
+      return if @db.schema(:player_stats).any? { |col| col.first == :user_id }
+
+      @db.alter_table(:player_stats) do
+        add_column :user_id, Integer
       end
     end
 
@@ -122,7 +134,7 @@ module Yahtzee
                 game_data: game.to_h.to_json,
                 updated_at: game.updated_at
               )
-      puts " Обновлено строк: #{count}"
+      puts "Обновлено строк: #{count}"
       game
     rescue StandardError => e
       puts "Ошибка при обновлении игры: #{e.message}"
