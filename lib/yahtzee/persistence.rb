@@ -3,6 +3,7 @@
 require 'sequel'
 require 'json'
 require 'logger'
+require_relative 'game'
 
 module Yahtzee
   class Persistence
@@ -25,7 +26,7 @@ module Yahtzee
       return nil unless record
 
       game_data = JSON.parse(record[:game_data], symbolize_names: true)
-      Yahtzee::Game.from_h(game_data)
+      Game.from_h(game_data)
     end
 
     def delete_game(chat_id)
@@ -87,10 +88,6 @@ module Yahtzee
         Integer :score, null: false
         Integer :won, default: 0
         DateTime :played_at, default: Sequel::CURRENT_TIMESTAMP
-      end
-
-      @db.alter_table(:player_stats) do
-        add_index :player_name unless indexes[:player_stats_player_name_index]
       end
     end
 

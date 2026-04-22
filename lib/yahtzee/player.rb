@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative 'score_calculator'
+
 module Yahtzee
   class Player
     attr_reader :id, :name, :scores, :used_categories

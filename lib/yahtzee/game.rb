@@ -1,5 +1,9 @@
 # frozen_string_literal: true
 
+require_relative 'dice'
+require_relative 'player'
+require_relative 'score_calculator'
+
 module Yahtzee
   class Game
     class Error < StandardError; end

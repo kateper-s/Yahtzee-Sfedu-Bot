@@ -2,6 +2,8 @@
 
 module Yahtzee
   class Dice
+    class NoRollsLeftError < StandardError; end
+
     DICE_EMOJIS = {
       1 => '⚀', 2 => '⚁', 3 => '⚂',
       4 => '⚃', 5 => '⚄', 6 => '⚅'

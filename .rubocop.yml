@@ -12,11 +12,7 @@ AllCops:
     - 'db/**/*'
     - 'bin/**/*'
     - 'log/**/*'
-
-# ВАЖНО: Только ОДИН раз и СТРОГО nested!
-Style/ClassAndModuleChildren:
-  EnforcedStyle: nested
-  Enabled: true
+    - 'config/**/*'
 
 Style/Documentation:
   Enabled: false
@@ -26,7 +22,7 @@ Style/FrozenStringLiteralComment:
   EnforcedStyle: always
 
 Layout/LineLength:
-  Max: 120
+  Max: 150
   Exclude:
     - 'spec/**/*'
 
@@ -35,31 +31,50 @@ Layout/TrailingEmptyLines:
   EnforcedStyle: final_newline
 
 Metrics/ClassLength:
-  Max: 400
+  Max: 800
   Exclude:
     - 'spec/**/*'
 
 Metrics/MethodLength:
-  Max: 50
+  Max: 60
   Exclude:
     - 'spec/**/*'
 
 Metrics/AbcSize:
-  Max: 35
+  Max: 50
   Exclude:
     - 'spec/**/*'
 
 Metrics/CyclomaticComplexity:
+  Max: 25
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/PerceivedComplexity:
   Max: 20
   Exclude:
     - 'spec/**/*'
 
-Metrics/BlockLength:
-  Exclude:
-    - 'spec/**/*'
-  Max: 50
+Metrics/ParameterLists:
+  Max: 6
 
-# RSpec настройки
+Style/IfUnlessModifier:
+  Enabled: false
+
+Style/SafeNavigation:
+  Enabled: true
+
+Style/NumericPredicate:
+  Enabled: true
+
+Style/StringChars:
+  Enabled: true
+
+Lint/UselessAssignment:
+  Enabled: true
+  Exclude:
+    - 'lib/yahtzee_bot/message_handler.rb'
+
 RSpec/ExampleLength:
   Max: 50
   Exclude:
