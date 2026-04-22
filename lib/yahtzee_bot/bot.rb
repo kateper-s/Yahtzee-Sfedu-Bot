@@ -45,27 +45,29 @@ module YahtzeeBot
 
       result = MessageHandler.handle(bot, message, @games[chat_id], @persistence)
 
-      @games[chat_id] = result if result.is_a?(Yahtzee::Game)
-      save_game(chat_id) if @games[chat_id]
+      # Обновляем игру в памяти, если результат - игра
+      return unless result.is_a?(Yahtzee::Game)
+
+      @games[chat_id] = result
+      save_game(chat_id)
     end
 
     def handle_callback(bot, callback)
       puts "🔘 Обработка callback: #{callback.data}"
-      puts "Текущие игры в памяти: #{@games.keys}"
       chat_id = callback.message.chat.id
 
       load_game(chat_id)
-      puts "После load_game game=#{@games[chat_id]&.object_id}"
+      puts "Текущая игра: #{@games[chat_id]&.object_id}"
 
       result = MessageHandler.handle_callback(bot, callback, @games[chat_id], @persistence)
       puts "handle_callback вернул #{result.class}, object_id=#{result&.object_id}"
 
+      # Обновляем игру в памяти, если результат - игра
       if result.is_a?(Yahtzee::Game)
         @games[chat_id] = result
-        puts "✅ Сохранено в @games[#{chat_id}] = #{result.object_id}"
+        save_game(chat_id)
+        puts '✅ Игра сохранена в БД'
       end
-
-      save_game(chat_id) if @games[chat_id]
     rescue StandardError => e
       puts "❌ Ошибка в callback: #{e.message}"
       puts e.backtrace
@@ -82,7 +84,7 @@ module YahtzeeBot
       puts "Загружаем игру из БД для чата #{chat_id}"
       saved_game = @persistence.load_game(chat_id)
       @games[chat_id] = saved_game if saved_game
-      puts "Загружена игра: #{@games[chat_id]&.object_id}"
+      puts "Загруженная игра: #{@games[chat_id]&.object_id}"
     end
 
     def save_game(chat_id)
@@ -91,6 +93,7 @@ module YahtzeeBot
 
       puts "Сохраняем игру #{game.object_id} в БД"
       @persistence.save_game(game)
+      puts '✅ Игра успешно сохранена'
     end
 
     def handle_error(bot, update, error)

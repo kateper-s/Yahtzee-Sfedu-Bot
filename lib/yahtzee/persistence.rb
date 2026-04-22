@@ -8,6 +8,9 @@ require_relative 'game'
 module Yahtzee
   class Persistence
     def initialize(db_path = 'db/yahtzee.db')
+      db_dir = File.dirname(db_path)
+      FileUtils.mkdir_p(db_dir) unless File.exist?(db_dir)
+
       @db = Sequel.sqlite(db_path)
       @db.loggers << Logger.new($stdout) if ENV['DEBUG']
       setup_tables
@@ -25,6 +28,7 @@ module Yahtzee
       record = games_table.where(chat_id:).first
       return nil unless record
 
+      puts "Загружаем игру из БД: #{record.inspect}"
       game_data = JSON.parse(record[:game_data], symbolize_names: true)
       Game.from_h(game_data)
     end
@@ -76,10 +80,15 @@ module Yahtzee
     def setup_tables
       @db.create_table? :games do
         primary_key :id
-        Integer :chat_id, unique: true, null: false
+        Integer :chat_id, null: false
         String :game_data, text: true, null: false
         DateTime :created_at, default: Sequel::CURRENT_TIMESTAMP
         DateTime :updated_at, default: Sequel::CURRENT_TIMESTAMP
+      end
+
+      existing_index = @db.indexes(:games).values.any? { |idx| idx[:columns] == [:chat_id] }
+      unless existing_index
+        @db.add_index :games, :chat_id, unique: true
       end
 
       @db.create_table? :player_stats do
@@ -99,17 +108,26 @@ module Yahtzee
         updated_at: game.updated_at
       )
       game.instance_variable_set(:@id, game_id)
+      puts "Игра вставлена в БД с ID: #{game_id}"
       game
+    rescue Sequel::UniqueConstraintViolation
+      puts 'Игра для этого чата уже существует, обновляем...'
+      update_game(game)
     end
 
     def update_game(game)
-      games_table
-        .where(id: game.id)
-        .update(
-          game_data: game.to_h.to_json,
-          updated_at: game.updated_at
-        )
+      count = games_table
+              .where(id: game.id)
+              .update(
+                game_data: game.to_h.to_json,
+                updated_at: game.updated_at
+              )
+      puts " Обновлено строк: #{count}"
       game
+    rescue StandardError => e
+      puts "Ошибка при обновлении игры: #{e.message}"
+      puts e.backtrace.join("\n")
+      raise
     end
   end
 end

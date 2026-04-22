@@ -60,7 +60,7 @@ module Yahtzee
     end
 
     def to_emojis
-      @values.map { |v| DICE_EMOJIS[v] }.join(' ')
+      @values.map { |v| "#{DICE_EMOJIS[v]} (#{v})" }.join(' ')
     end
 
     def sum
