@@ -67,6 +67,8 @@ module YahtzeeBot
           stop_game(bot, chat_id, game, persistence, callback)
         when 'main_menu'
           show_main_menu(bot, chat_id, game, callback)
+        when 'main_menu_root' # новый callback для выхода в корневое меню без игры
+          show_main_menu(bot, chat_id, nil, callback)
         when 'reroll_start'
           show_reroll_selection(bot, chat_id, game, callback)
         when /^reroll_toggle_(\d+)$/
@@ -76,7 +78,7 @@ module YahtzeeBot
           confirm_reroll(bot, chat_id, game, callback)
         when /^score_(\d+)$/
           category = ::Regexp.last_match(1).to_i
-          select_category(bot, chat_id, game, category, callback)
+          select_category(bot, chat_id, game, category, persistence, callback)
         when /^join_name_(.+)$/
           name = ::Regexp.last_match(1)
           result = join_game(bot, chat_id, game, name, user, callback)
@@ -129,7 +131,6 @@ module YahtzeeBot
         end
 
         if callback
-          # Вместо редактирования отправляем новое сообщение
           bot.api.send_message(
             chat_id:,
             text:,
@@ -163,8 +164,7 @@ module YahtzeeBot
           inline_keyboard: [
             [{ text: '➕ Присоединиться', callback_data: 'join_game' }],
             [{ text: '🚀 Начать игру', callback_data: 'start_game' }],
-            [{ text: '🗑 Отменить игру', callback_data: 'stop_game' }],
-            [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+            [{ text: '🗑 Отменить игру', callback_data: 'stop_game' }]
           ]
         )
       end
@@ -208,8 +208,7 @@ module YahtzeeBot
           inline_keyboard: [
             buttons,
             [{ text: '✅ Перебросить', callback_data: 'reroll_confirm' }],
-            [{ text: '❌ Отмена', callback_data: 'categories' }],
-            [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+            [{ text: '❌ Отмена', callback_data: 'categories' }]
           ]
         )
       end
@@ -474,7 +473,7 @@ module YahtzeeBot
         game
       end
 
-      def select_category(bot, chat_id, game, category, callback)
+      def select_category(bot, chat_id, game, category, persistence, callback)
         unless valid_game_state?(bot, chat_id, game, callback, check_dice: true)
           return nil
         end
@@ -629,7 +628,7 @@ module YahtzeeBot
       end
 
       def show_stats(bot, chat_id, user, persistence, callback)
-        stats = persistence.get_player_stats(user.username || user.first_name)
+        stats = persistence.get_player_stats(user.id)
 
         text = "📊 **Ваша статистика**\n\n"
         text += "🎮 Игр сыграно: #{stats[:games_played]}\n"
@@ -639,7 +638,7 @@ module YahtzeeBot
 
         keyboard = Telegram::Bot::Types::InlineKeyboardMarkup.new(
           inline_keyboard: [
-            [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+            [{ text: '🏠 Главное меню', callback_data: 'main_menu_root' }]  # изменено на main_menu_root
           ]
         )
 
@@ -680,7 +679,7 @@ module YahtzeeBot
 
         keyboard = Telegram::Bot::Types::InlineKeyboardMarkup.new(
           inline_keyboard: [
-            [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+            [{ text: '🏠 Главное меню', callback_data: 'main_menu_root' }]  # изменено на main_menu_root
           ]
         )
 
@@ -704,12 +703,12 @@ module YahtzeeBot
 
       def stop_game(bot, chat_id, game, persistence, callback = nil)
         if game
-          if game.players.any?
+          if game.players.any? && game.players.any? { |p| p.used_categories.any? }
             max_score = game.players.map(&:total_score).max
             winners = game.players.select { |p| p.total_score == max_score }
             game.players.each do |player|
               won = winners.include?(player)
-              persistence.save_player_stats(player.name, player.total_score, won:)
+              persistence.save_player_stats(player.id, player.name, player.total_score, won:)
             end
           end
 
@@ -717,7 +716,7 @@ module YahtzeeBot
           persistence.delete_game(chat_id)
         end
 
-        text = 'Игра завершена. Результаты сохранены. Используйте меню чтобы начать новую игру.'
+        text = '🛑 Игра завершена. Результаты сохранены. Используйте меню чтобы начать новую игру.'
 
         if callback
           bot.api.edit_message_text(
@@ -740,7 +739,7 @@ module YahtzeeBot
 
         keyboard = Telegram::Bot::Types::InlineKeyboardMarkup.new(
           inline_keyboard: [
-            [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+            [{ text: '🏠 Главное меню', callback_data: 'main_menu_root' }]  # изменено на main_menu_root
           ]
         )
 
@@ -767,7 +766,7 @@ module YahtzeeBot
 
         keyboard = Telegram::Bot::Types::InlineKeyboardMarkup.new(
           inline_keyboard: [
-            [{ text: '🏠 Главное меню', callback_data: 'main_menu' }]
+            [{ text: '🏠 Главное меню', callback_data: 'main_menu_root' }]  # изменено на main_menu_root
           ]
         )
 
@@ -830,7 +829,7 @@ module YahtzeeBot
                 else
                   player == winner
                 end
-          persistence.save_player_stats(player.name, player.total_score, won:)
+          persistence.save_player_stats(player.id, player.name, player.total_score, won:)
         end
 
         text += if winner.is_a?(Array)
