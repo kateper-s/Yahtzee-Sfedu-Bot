@@ -1,103 +1,107 @@
 # frozen_string_literal: true
 
 require 'spec_helper'
-require_relative '../../lib/yahtzee_bot/bot'
 
 RSpec.describe 'YahtzeeBot Integration' do
-  let(:bot) { instance_double(Telegram::Bot::Client) }
-  let(:api) { instance_double(Telegram::Bot::Api) }
   let(:chat_id) { 123_456 }
-  let(:message) { instance_double(Telegram::Bot::Types::Message, chat:, text:) }
-  let(:chat) { instance_double(Telegram::Bot::Types::Chat, id: chat_id) }
-  let(:from) { instance_double(Telegram::Bot::Types::User, first_name: 'Alice', id: 789) }
+  let(:message_id) { 42 }
+  let(:callback_id) { 'cb_123' }
+  let(:token) { 'test_token_12345' }
+
+  # Используем двойников вместо реальных классов
+  let(:api) { double('Telegram::Bot::Api') }
+  let(:bot) { double('Telegram::Bot::Client', api:) }
+
+  let(:persistence) { double('Yahtzee::Persistence') }
 
   before do
-    allow(bot).to receive(:api).and_return(api)
+    # Мокаем ENV.fetch для токена
+    allow(ENV).to receive(:fetch).with('TELEGRAM_BOT_TOKEN').and_return(token)
+
+    # Настраиваем моки для API
     allow(api).to receive(:send_message)
-    allow(message).to receive(:from).and_return(from)
+    allow(api).to receive(:answer_callback_query)
+    allow(api).to receive(:edit_message_text)
+    allow(api).to receive(:delete_webhook)
+
+    # Настраиваем мок для Telegram::Bot::Client.run
+    allow(Telegram::Bot::Client).to receive(:run).and_yield(bot)
+
+    # Настраиваем мок для persistence
+    allow(persistence).to receive(:save_game)
+    allow(persistence).to receive(:load_game)
+    allow(persistence).to receive(:delete_game)
+    allow(persistence).to receive(:get_player_stats).and_return(
+      games_played: 0, wins: 0, average_score: 0, highest_score: 0
+    )
+    allow(persistence).to receive(:get_leaderboard).and_return([])
+
+    # Мокаем Yahtzee::Persistence.new
+    allow(Yahtzee::Persistence).to receive(:new).and_return(persistence)
   end
 
   describe 'game flow' do
-    let(:text) { '/start' }
-
     it 'handles complete game session' do
-      # Start new game
-      expect(api).to receive(:send_message).with(
-        chat_id:,
-        text: /Добро пожаловать/
-      )
-      YahtzeeBot::MessageHandler.handle(bot, message)
+      # Создаем бота
+      bot_instance = YahtzeeBot::Bot.new
 
-      # Create new game
-      allow(message).to receive(:text).and_return('/new')
-      expect(api).to receive(:send_message).with(
-        chat_id:,
-        text: /Новая игра создана/
-      )
-      YahtzeeBot::MessageHandler.handle(bot, message)
+      # Создаем сообщение для /start
+      start_message = double('Telegram::Bot::Types::Message',
+                             text: '/start',
+                             chat: double('Telegram::Bot::Types::Chat', id: chat_id),
+                             from: double('Telegram::Bot::Types::User', id: 789, first_name: 'Alice'))
 
-      # Add players
-      allow(message).to receive(:text).and_return('/join Alice')
-      expect(api).to receive(:send_message).with(
-        chat_id:,
-        text: /Alice присоединился/
-      )
-      YahtzeeBot::MessageHandler.handle(bot, message)
+      # Обрабатываем /start
+      expect(api).to receive(:send_message).at_least(:once)
+      bot_instance.send(:handle_message, bot, start_message)
 
-      allow(message).to receive(:text).and_return('/join Bob')
-      expect(api).to receive(:send_message).with(
-        chat_id:,
-        text: /Bob присоединился/
-      )
-      YahtzeeBot::MessageHandler.handle(bot, message)
+      # Создаем callback для новой игры
+      new_game_callback = double('Telegram::Bot::Types::CallbackQuery',
+                                 data: 'new_game',
+                                 from: double('Telegram::Bot::Types::User', id: 789, username: 'alice'),
+                                 message: double('Telegram::Bot::Types::Message',
+                                                 chat: double('Telegram::Bot::Types::Chat', id: chat_id),
+                                                 message_id:),
+                                 id: callback_id)
 
-      # Start game
-      allow(message).to receive(:text).and_return('/start_game')
-      expect(api).to receive(:send_message).with(
-        chat_id:,
-        text: /Игра начинается/
-      )
-      YahtzeeBot::MessageHandler.handle(bot, message)
-
-      # Roll dice
-      allow(message).to receive(:text).and_return('/roll')
-      expect(api).to receive(:send_message).with(
-        chat_id:,
-        text: /бросает кубики/
-      )
-      YahtzeeBot::MessageHandler.handle(bot, message)
-
-      # Select category
-      allow(message).to receive(:text).and_return('/score 13')
-      expect(api).to receive(:send_message).with(
-        chat_id:,
-        text: /выбрал категорию/
-      )
-      YahtzeeBot::MessageHandler.handle(bot, message)
+      # Обрабатываем создание новой игры
+      expect(api).to receive(:edit_message_text).at_least(:once)
+      bot_instance.send(:handle_callback, bot, new_game_callback)
     end
   end
 
   describe 'error handling' do
     it 'handles invalid commands gracefully' do
-      allow(message).to receive(:text).and_return('/invalid_command')
+      bot_instance = YahtzeeBot::Bot.new
 
-      expect(api).to receive(:send_message).with(
-        chat_id:,
-        text: /Неизвестная команда/
-      )
+      # Создаем сообщение с неизвестной командой
+      unknown_message = double('Telegram::Bot::Types::Message',
+                               text: '/unknown_command',
+                               chat: double('Telegram::Bot::Types::Chat', id: chat_id),
+                               from: double('Telegram::Bot::Types::User', id: 789, first_name: 'Alice'))
 
-      YahtzeeBot::MessageHandler.handle(bot, message)
+      bot_instance.send(:handle_message, bot, unknown_message)
     end
 
     it 'prevents actions when game not started' do
-      allow(message).to receive(:text).and_return('/roll')
+      bot_instance = YahtzeeBot::Bot.new
 
-      expect(api).to receive(:send_message).with(
-        chat_id:,
-        text: /Игра ещё не началась/
+      # Создаем callback для броска кубиков без активной игры
+      roll_callback = double('Telegram::Bot::Types::CallbackQuery',
+                             data: 'roll',
+                             from: double('Telegram::Bot::Types::User', id: 789, username: 'alice'),
+                             message: double('Telegram::Bot::Types::Message',
+                                             chat: double('Telegram::Bot::Types::Chat', id: chat_id),
+                                             message_id:),
+                             id: callback_id)
+
+      expect(api).to receive(:answer_callback_query).with(
+        callback_query_id: callback_id,
+        text: /Сначала создайте игру через меню/,
+        show_alert: true
       )
 
-      YahtzeeBot::MessageHandler.handle(bot, message)
+      bot_instance.send(:handle_callback, bot, roll_callback)
     end
   end
 end

@@ -4,205 +4,177 @@ require 'spec_helper'
 require_relative '../../../lib/yahtzee_bot/bot'
 
 RSpec.describe YahtzeeBot::Bot do
-  let(:bot) { described_class.new }
-  let(:telegram_bot) { instance_double(Telegram::Bot::Client) }
-  let(:api) { instance_double(Telegram::Bot::Api) }
-  let(:persistence) { instance_double(Yahtzee::Persistence) }
+  let(:token) { 'test_token_12345' }
+  let(:chat_id) { 123_456 }
+  let(:message_id) { 42 }
+  let(:callback_id) { 'cb_123' }
+
+  # Используем обычные double вместо instance_double
+  let(:bot_api) { double('Telegram::Bot::Api') }
+  let(:telegram_bot) { double('Telegram::Bot::Client', api: bot_api) }
+
+  let(:bot_instance) { described_class.new }
+  let(:persistence) { double('Yahtzee::Persistence') }
+  let(:game) { double('Yahtzee::Game', object_id: 1001, chat_id:) }
 
   before do
+    allow(ENV).to receive(:fetch).with('TELEGRAM_BOT_TOKEN').and_return(token)
     allow(Yahtzee::Persistence).to receive(:new).and_return(persistence)
     allow(persistence).to receive(:load_game)
     allow(persistence).to receive(:save_game)
-    allow(persistence).to receive(:delete_game)
+
+    # Настраиваем моки для API
+    allow(bot_api).to receive(:send_message)
+    allow(bot_api).to receive(:answer_callback_query)
+    allow(bot_api).to receive(:edit_message_text)
+    allow(bot_api).to receive(:delete_webhook)
+
+    # Настраиваем мок для Telegram::Bot::Client.run
+    allow(Telegram::Bot::Client).to receive(:run).and_yield(telegram_bot)
   end
 
   describe '#initialize' do
     it 'initializes with token from ENV' do
-      expect(bot.instance_variable_get(:@token)).to eq(ENV.fetch('TELEGRAM_BOT_TOKEN', nil))
+      expect(bot_instance.instance_variable_get(:@token)).to eq(token)
     end
 
     it 'creates persistence instance' do
-      expect(bot.instance_variable_get(:@persistence)).to eq(persistence)
+      expect(bot_instance.instance_variable_get(:@persistence)).to eq(persistence)
     end
 
     it 'initializes empty games hash' do
-      expect(bot.instance_variable_get(:@games)).to eq({})
+      games = bot_instance.instance_variable_get(:@games)
+      expect(games).to be_empty
     end
   end
 
   describe '#run' do
+    it 'starts the bot and listens for updates' do
+      expect(Telegram::Bot::Client).to receive(:run).with(token).and_yield(telegram_bot)
+      expect { Thread.new { bot_instance.run }.kill }.not_to raise_error
+    end
+  end
+
+  describe '#handle_message' do
     let(:message) do
-      instance_double(
-        Telegram::Bot::Types::Message,
-        chat: instance_double(Telegram::Bot::Types::Chat, id: 123_456),
-        from: instance_double(Telegram::Bot::Types::User, first_name: 'Alice', id: 789),
-        text: '/start'
-      )
+      double('Telegram::Bot::Types::Message',
+             chat: double('Telegram::Bot::Types::Chat', id: chat_id),
+             text: '/start')
     end
 
     before do
-      allow(Telegram::Bot::Client).to receive(:run).and_yield(telegram_bot)
-      allow(telegram_bot).to receive(:listen).and_yield(message)
-      allow(telegram_bot).to receive(:api).and_return(api)
-      allow(api).to receive(:send_message)
+      allow(bot_instance).to receive(:load_game)
+      allow(bot_instance).to receive(:save_game)
+      allow(YahtzeeBot::MessageHandler).to receive(:handle).and_return(nil)
     end
 
-    it 'processes incoming messages' do
+    it 'loads game for chat' do
+      expect(bot_instance).to receive(:load_game).with(chat_id)
+      bot_instance.send(:handle_message, telegram_bot, message)
+    end
+
+    it 'calls MessageHandler.handle' do
       expect(YahtzeeBot::MessageHandler).to receive(:handle)
         .with(telegram_bot, message, nil, persistence)
-
-      bot.run
+      bot_instance.send(:handle_message, telegram_bot, message)
     end
 
-    it 'loads saved game for chat' do
-      saved_game = instance_double(Yahtzee::Game)
-      allow(persistence).to receive(:load_game).with(123_456).and_return(saved_game)
+    it 'does not save game when result is not a Game' do
+      allow(YahtzeeBot::MessageHandler).to receive(:handle).and_return('some string')
+      expect(bot_instance).not_to receive(:save_game)
+      bot_instance.send(:handle_message, telegram_bot, message)
+    end
+  end
 
-      expect(YahtzeeBot::MessageHandler).to receive(:handle)
-        .with(telegram_bot, message, saved_game, persistence)
-
-      bot.run
+  describe '#handle_callback' do
+    let(:callback) do
+      double('Telegram::Bot::Types::CallbackQuery',
+             data: 'roll',
+             id: callback_id,
+             message: double('Telegram::Bot::Types::Message',
+                             chat: double('Telegram::Bot::Types::Chat', id: chat_id),
+                             message_id:))
     end
 
-    it 'handles multiple messages concurrently' do
-      messages = Array.new(3) { message }
-      allow(telegram_bot).to receive(:listen).and_yield(messages[0])
-                                             .and_yield(messages[1])
-                                             .and_yield(messages[2])
-
-      expect(YahtzeeBot::MessageHandler).to receive(:handle).exactly(3).times
-
-      bot.run
+    before do
+      allow(bot_instance).to receive(:load_game)
+      allow(bot_instance).to receive(:save_game)
+      allow(YahtzeeBot::MessageHandler).to receive(:handle_callback).and_return(nil)
     end
 
-    it 'saves game after processing message' do
-      game = instance_double(Yahtzee::Game, chat_id: 123_456)
-      bot.instance_variable_get(:@games)[123_456] = game
+    it 'loads game for chat' do
+      expect(bot_instance).to receive(:load_game).with(chat_id)
+      bot_instance.send(:handle_callback, telegram_bot, callback)
+    end
 
-      allow(YahtzeeBot::MessageHandler).to receive(:handle)
+    it 'calls MessageHandler.handle_callback' do
+      expect(YahtzeeBot::MessageHandler).to receive(:handle_callback)
+        .with(telegram_bot, callback, nil, persistence)
+      bot_instance.send(:handle_callback, telegram_bot, callback)
+    end
 
+    it 'saves game when result is a Game' do
+      allow(YahtzeeBot::MessageHandler).to receive(:handle_callback).and_return(game)
+      expect(bot_instance).to receive(:save_game).with(chat_id)
+      bot_instance.send(:handle_callback, telegram_bot, callback)
+    end
+
+    it 'does not save game when result is not a Game' do
+      allow(YahtzeeBot::MessageHandler).to receive(:handle_callback).and_return('not a game')
+      expect(bot_instance).not_to receive(:save_game)
+      bot_instance.send(:handle_callback, telegram_bot, callback)
+    end
+
+    it 'answers callback query' do
+      expect(bot_api).to receive(:answer_callback_query).with(callback_query_id: callback_id)
+      bot_instance.send(:handle_callback, telegram_bot, callback)
+    end
+
+    it 'handles errors and answers with error message' do
+      allow(YahtzeeBot::MessageHandler).to receive(:handle_callback).and_raise(StandardError, 'Test error')
+      expect(bot_api).to receive(:answer_callback_query).with(
+        callback_query_id: callback_id,
+        text: 'Ошибка: Test error',
+        show_alert: true
+      )
+      bot_instance.send(:handle_callback, telegram_bot, callback)
+    end
+  end
+
+  describe '#load_game' do
+    it 'does nothing if game already loaded' do
+      games = { chat_id => game }
+      bot_instance.instance_variable_set(:@games, games)
+      expect(persistence).not_to receive(:load_game)
+      bot_instance.send(:load_game, chat_id)
+    end
+
+    it 'loads game from persistence when not in memory' do
+      allow(persistence).to receive(:load_game).with(chat_id).and_return(game)
+      bot_instance.send(:load_game, chat_id)
+      games = bot_instance.instance_variable_get(:@games)
+      expect(games[chat_id]).to eq(game)
+    end
+
+    it 'does nothing when no saved game exists' do
+      allow(persistence).to receive(:load_game).with(chat_id).and_return(nil)
+      bot_instance.send(:load_game, chat_id)
+      games = bot_instance.instance_variable_get(:@games)
+      expect(games[chat_id]).to be_nil
+    end
+  end
+
+  describe '#save_game' do
+    it 'saves game to persistence' do
+      games = { chat_id => game }
+      bot_instance.instance_variable_set(:@games, games)
       expect(persistence).to receive(:save_game).with(game)
-
-      bot.run
+      bot_instance.send(:save_game, chat_id)
     end
 
-    it 'handles non-message updates gracefully' do
-      callback_query = instance_double(Telegram::Bot::Types::CallbackQuery)
-      allow(telegram_bot).to receive(:listen).and_yield(callback_query)
-
-      expect(YahtzeeBot::MessageHandler).not_to receive(:handle)
-
-      bot.run
-    end
-  end
-
-  describe 'error handling' do
-    let(:message) do
-      instance_double(
-        Telegram::Bot::Types::Message,
-        chat: instance_double(Telegram::Bot::Types::Chat, id: 123_456),
-        from: instance_double(Telegram::Bot::Types::User, first_name: 'Alice', id: 789),
-        text: '/roll'
-      )
-    end
-
-    before do
-      allow(Telegram::Bot::Client).to receive(:run).and_yield(telegram_bot)
-      allow(telegram_bot).to receive(:listen).and_yield(message)
-      allow(telegram_bot).to receive(:api).and_return(api)
-    end
-
-    it 'handles Game::Error exceptions' do
-      error = Yahtzee::Game::GameNotStartedError.new('Game is not in progress')
-      allow(YahtzeeBot::MessageHandler).to receive(:handle).and_raise(error)
-
-      expect(api).to receive(:send_message).with(
-        chat_id: 123_456,
-        text: '❌ Game is not in progress'
-      )
-
-      bot.run
-    end
-
-    it 'handles StandardError exceptions' do
-      error = StandardError.new('Something went wrong')
-      allow(YahtzeeBot::MessageHandler).to receive(:handle).and_raise(error)
-
-      expect(api).to receive(:send_message).with(
-        chat_id: 123_456,
-        text: "❌ Произошла ошибка. Пожалуйста, попробуйте снова.\nSomething went wrong"
-      )
-
-      bot.run
-    end
-
-    it 'logs error backtrace' do
-      error = StandardError.new('Test error')
-      allow(YahtzeeBot::MessageHandler).to receive(:handle).and_raise(error)
-      allow(api).to receive(:send_message)
-
-      expect { bot.run }.to output(/Error: StandardError - Test error/).to_stdout
-    end
-
-    it 'continues processing after error' do
-      messages = [message, message]
-      allow(telegram_bot).to receive(:listen).and_yield(messages[0])
-                                             .and_yield(messages[1])
-
-      allow(YahtzeeBot::MessageHandler).to receive(:handle).and_raise(StandardError)
-      allow(api).to receive(:send_message)
-
-      expect(YahtzeeBot::MessageHandler).to receive(:handle).twice
-
-      bot.run
-    end
-  end
-
-  describe 'game state management' do
-    let(:message) do
-      instance_double(
-        Telegram::Bot::Types::Message,
-        chat: instance_double(Telegram::Bot::Types::Chat, id: 123_456),
-        text: '/new'
-      )
-    end
-
-    before do
-      allow(Telegram::Bot::Client).to receive(:run).and_yield(telegram_bot)
-      allow(telegram_bot).to receive(:listen).and_yield(message)
-      allow(telegram_bot).to receive(:api).and_return(api)
-      allow(api).to receive(:send_message)
-    end
-
-    it 'maintains separate games for different chats' do
-      chat1_message = message
-      chat2_message = instance_double(
-        Telegram::Bot::Types::Message,
-        chat: instance_double(Telegram::Bot::Types::Chat, id: 789_012),
-        text: '/new'
-      )
-
-      allow(telegram_bot).to receive(:listen).and_yield(chat1_message)
-                                             .and_yield(chat2_message)
-
-      expect(persistence).to receive(:load_game).with(123_456)
-      expect(persistence).to receive(:load_game).with(789_012)
-
-      bot.run
-    end
-
-    it 'cleans up finished games' do
-      game = instance_double(Yahtzee::Game, state: :finished, chat_id: 123_456)
-      bot.instance_variable_get(:@games)[123_456] = game
-
-      allow(YahtzeeBot::MessageHandler).to receive(:handle)
-      allow(game).to receive(:finish)
-
-      expect(persistence).to receive(:delete_game).with(123_456)
-
-      # Simulate /stop command
-      allow(message).to receive(:text).and_return('/stop')
-      bot.run
+    it 'does nothing when game not in memory' do
+      expect(persistence).not_to receive(:save_game)
+      bot_instance.send(:save_game, chat_id)
     end
   end
 end

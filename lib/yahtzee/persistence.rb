@@ -9,7 +9,7 @@ module Yahtzee
   class Persistence
     def initialize(db_path = 'db/yahtzee.db')
       db_dir = File.dirname(db_path)
-      FileUtils.mkdir_p(db_dir) unless File.exist?(db_dir)
+      FileUtils.mkdir_p(db_dir)
 
       @db = Sequel.sqlite(db_path)
       @db.loggers << Logger.new($stdout) if ENV['DEBUG']

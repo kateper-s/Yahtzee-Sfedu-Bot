@@ -130,20 +130,13 @@ module YahtzeeBot
 
         if callback
           # Вместо редактирования отправляем новое сообщение
-          bot.api.send_message(
-            chat_id:,
-            text:,
-            reply_markup: keyboard,
-            parse_mode: 'Markdown'
-          )
-        else
-          bot.api.send_message(
-            chat_id:,
-            text:,
-            reply_markup: keyboard,
-            parse_mode: 'Markdown'
-          )
         end
+        bot.api.send_message(
+          chat_id:,
+          text:,
+          reply_markup: keyboard,
+          parse_mode: 'Markdown'
+        )
       end
 
       def main_menu_keyboard
@@ -216,7 +209,7 @@ module YahtzeeBot
 
       def category_keyboard(available_categories, game = nil)
         buttons = available_categories.map do |cat|
-          score_text = if game && game.dice.rolled?
+          score_text = if game&.dice&.rolled?
                          score = Yahtzee::ScoreCalculator.calculate(cat, game.dice.values)
                          "#{cat}. #{CATEGORY_NAMES[cat]} (#{score}⭐)"
                        else
@@ -395,8 +388,8 @@ module YahtzeeBot
         end
 
         selected = callback.message.reply_markup.inline_keyboard[0]
-                           .map { |btn| btn.callback_data.match(/reroll_toggle_(\d+)/) { |m| m[1].to_i } if btn.text.include?('✅') }
-                           .compact
+                           .filter_map { |btn| btn.callback_data.match(/reroll_toggle_(\d+)/) { |m| m[1].to_i } if btn.text.include?('✅') }
+
 
         if selected.include?(position)
           selected.delete(position)
@@ -422,8 +415,8 @@ module YahtzeeBot
         end
 
         selected = callback.message.reply_markup.inline_keyboard[0]
-                           .map { |btn| btn.callback_data.match(/reroll_toggle_(\d+)/) { |m| m[1].to_i } if btn.text.include?('✅') }
-                           .compact
+                           .filter_map { |btn| btn.callback_data.match(/reroll_toggle_(\d+)/) { |m| m[1].to_i } if btn.text.include?('✅') }
+
 
         if selected.empty?
           bot.api.answer_callback_query(
@@ -531,7 +524,7 @@ module YahtzeeBot
           short_name = player.name[0...name_width]
           header += " #{short_name.ljust(name_width)}"
         end
-        header + "\n" + ('-' * (category_width + (game.players.size * (name_width + 1))))
+        "#{header}\n#{'-' * (category_width + (game.players.size * (name_width + 1)))}"
       end
 
       def format_categories_rows(game, categories)
@@ -582,13 +575,11 @@ module YahtzeeBot
 
         if callback
           bot.api.edit_message_text(chat_id:, message_id: callback.message.message_id, text: upper_text, parse_mode: 'Markdown')
-          bot.api.send_message(chat_id:, text: lower_text, parse_mode: 'Markdown')
-          bot.api.send_message(chat_id:, text: '📋 Таблица завершена. Выберите действие:', reply_markup: return_keyboard)
         else
           bot.api.send_message(chat_id:, text: upper_text, parse_mode: 'Markdown')
-          bot.api.send_message(chat_id:, text: lower_text, parse_mode: 'Markdown')
-          bot.api.send_message(chat_id:, text: '📋 Таблица завершена. Выберите действие:', reply_markup: return_keyboard)
         end
+        bot.api.send_message(chat_id:, text: lower_text, parse_mode: 'Markdown')
+        bot.api.send_message(chat_id:, text: '📋 Таблица завершена. Выберите действие:', reply_markup: return_keyboard)
       end
 
       def show_current_state(bot, chat_id, game, callback)

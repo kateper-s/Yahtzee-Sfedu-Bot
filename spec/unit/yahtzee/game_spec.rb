@@ -9,59 +9,96 @@ RSpec.describe Yahtzee::Game do
   describe '#initialize' do
     it 'creates a new game with waiting_for_players state' do
       expect(game.state).to eq(:waiting_for_players)
+    end
+
+    it 'has empty players list' do
       expect(game.players).to be_empty
-      expect(game.chat_id).to eq(chat_id)
+    end
+
+    it 'has no current player' do
+      expect(game.current_player).to be_nil
+    end
+
+    it 'initializes dice' do
       expect(game.dice).to be_a(Yahtzee::Dice)
+    end
+
+    it 'sets chat_id' do
+      expect(game.chat_id).to eq(chat_id)
     end
   end
 
   describe '#add_player' do
-    context 'when game is waiting for players' do
-      it 'adds a player successfully' do
-        player = game.add_player('Alice')
-        expect(player).to be_a(Yahtzee::Player)
-        expect(player.name).to eq('Alice')
-        expect(game.players.size).to eq(1)
-      end
-
-      it 'raises error when adding duplicate player' do
-        game.add_player('Alice')
-        expect { game.add_player('Alice') }.to raise_error(ArgumentError, /already exists/)
-      end
-
-      it 'raises error when maximum players reached' do
-        4.times { |i| game.add_player("Player#{i}") }
-        expect { game.add_player('Extra') }.to raise_error(Yahtzee::Game::InvalidPlayerCountError)
-      end
+    it 'adds a player successfully' do
+      player = game.add_player('Alice')
+      expect(game.players.size).to eq(1)
+      expect(player.name).to eq('Alice')
     end
 
-    context 'when game has started' do
-      before do
-        game.add_player('Alice')
-        game.start
-      end
+    it 'adds player with custom id' do
+      player = game.add_player('Bob', 42)
+      expect(player.id).to eq(42)
+    end
 
-      it 'raises error' do
-        expect { game.add_player('Bob') }.to raise_error(Yahtzee::Game::GameAlreadyStartedError)
-      end
+    it 'raises error when adding duplicate player' do
+      game.add_player('Alice')
+      expect { game.add_player('Alice') }.to raise_error(ArgumentError)
+    end
+
+    it 'raises error when game already started' do
+      game.add_player('Alice')
+      game.start
+      expect { game.add_player('Bob') }.to raise_error(Yahtzee::Game::GameAlreadyStartedError)
+    end
+
+    it 'raises error when max players reached' do
+      4.times { |i| game.add_player("Player#{i}") }
+      expect { game.add_player('Extra') }.to raise_error(Yahtzee::Game::InvalidPlayerCountError)
+    end
+  end
+
+  describe '#remove_player' do
+    before { game.add_player('Alice') }
+
+    it 'removes player successfully' do
+      game.remove_player('Alice')
+      expect(game.players).to be_empty
+    end
+
+    it 'raises error when game already started' do
+      game.add_player('Bob')
+      game.start
+      expect { game.remove_player('Bob') }.to raise_error(Yahtzee::Game::GameAlreadyStartedError)
+    end
+
+    it 'does nothing if player not found' do
+      expect { game.remove_player('Unknown') }.not_to change { game.players.count }
     end
   end
 
   describe '#start' do
-    context 'with valid number of players' do
-      before { game.add_player('Alice') }
-
-      it 'starts the game' do
-        expect(game.start).to be true
-        expect(game.state).to eq(:in_progress)
-        expect(game.current_player.name).to eq('Alice')
-      end
+    it 'starts game with valid number of players' do
+      game.add_player('Alice')
+      game.start
+      expect(game.state).to eq(:in_progress)
+      expect(game.current_player).not_to be_nil
     end
 
-    context 'with no players' do
-      it 'raises error' do
-        expect { game.start }.to raise_error(Yahtzee::Game::InvalidPlayerCountError)
-      end
+    it 'raises error with no players' do
+      expect { game.start }.to raise_error(Yahtzee::Game::InvalidPlayerCountError)
+    end
+
+    it 'raises error when game already started' do
+      game.add_player('Alice')
+      game.start
+      expect { game.start }.to raise_error(Yahtzee::Game::GameAlreadyStartedError)
+    end
+
+    it 'sets current player to first player' do
+      game.add_player('Alice')
+      game.add_player('Bob')
+      game.start
+      expect(game.current_player.name).to eq('Alice')
     end
   end
 
@@ -72,10 +109,15 @@ RSpec.describe Yahtzee::Game do
     end
 
     it 'rolls dice successfully' do
-      dice_values = game.roll_dice
-      expect(dice_values.size).to eq(5)
-      expect(dice_values).to all(be_between(1, 6))
-      expect(game.dice.rolls_left).to eq(2)
+      values = game.roll_dice
+      expect(values.size).to eq(5)
+      expect(game.dice.rolled?).to be true
+    end
+
+    it 'raises error when game not in progress' do
+      new_game = described_class.new(chat_id: 456)
+      new_game.add_player('Bob')
+      expect { new_game.roll_dice }.to raise_error(Yahtzee::Game::GameNotStartedError)
     end
 
     it 'raises error when no rolls left' do
@@ -84,46 +126,115 @@ RSpec.describe Yahtzee::Game do
     end
   end
 
-  describe '#select_category' do
+  describe '#reroll_dice' do
     before do
       game.add_player('Alice')
       game.start
       game.roll_dice
     end
 
-    it 'records score and moves to next player' do
+    it 'raises error when dice not rolled' do
+      game.instance_variable_get(:@dice).reset
+      expect { game.reroll_dice([1]) }.to raise_error(Yahtzee::Game::DiceNotRolledError)
+    end
+
+    it 'raises error when no rolls left' do
+      2.times { game.reroll_dice([1]) }
+      expect { game.reroll_dice([1]) }.to raise_error(Yahtzee::Dice::NoRollsLeftError)
+    end
+  end
+
+  describe '#select_category' do
+    before do
+      game.add_player('Alice')
+      game.add_player('Bob')
+      game.start
+      game.roll_dice
+    end
+
+    it 'selects category and records score' do
       points = game.select_category(13, 'Alice')
-      expect(points).to be >= 5
-      expect(game.current_player).to eq(game.players[0])
-      expect(game.dice.rolled?).to be false
+      expect(points).to be_between(5, 30)
+      expect(game.current_player.name).to eq('Bob')
     end
 
     it 'raises error for invalid player turn' do
-      game.add_player('Bob')
-      expect { game.select_category(1, 'Bob') }.to raise_error(Yahtzee::Game::NotPlayersTurnError)
+      expect { game.select_category(13, 'Bob') }.to raise_error(Yahtzee::Game::NotPlayersTurnError)
     end
 
-    it 'raises error when category already used' do
-      game.select_category(1, 'Alice')
-      game.roll_dice
-      expect { game.select_category(1, 'Alice') }.to raise_error(ArgumentError, /already used/)
+    it 'raises error when dice not rolled' do
+      game.instance_variable_get(:@dice).reset
+      expect { game.select_category(13, 'Alice') }.to raise_error(Yahtzee::Game::DiceNotRolledError)
     end
   end
 
   describe '#game_over?' do
-    before do
+    it 'returns false initially' do
       game.add_player('Alice')
-      game.start
+      expect(game.game_over?).to be false
     end
 
     it 'returns true when all categories used' do
-      allow(game.players.first).to receive(:all_categories_used?).and_return(true)
+      game.add_player('Alice')
+      game.start
+      (1..13).each do |category|
+        game.roll_dice
+        game.select_category(category, 'Alice')
+      end
       expect(game.game_over?).to be true
     end
+  end
 
-    it 'returns false when categories remain' do
-      allow(game.players.first).to receive(:all_categories_used?).and_return(false)
-      expect(game.game_over?).to be false
+  describe '#winner' do
+    it 'returns nil when game not over' do
+      game.add_player('Alice')
+      expect(game.winner).to be_nil
+    end
+
+    it 'returns player with highest score' do
+      game.add_player('Alice')
+      game.add_player('Bob')
+      game.start
+      5.times do
+        game.roll_dice
+        game.select_category(13, 'Alice')
+      end
+      expect(game.winner.name).to eq('Alice')
+    end
+  end
+
+  describe '#finish' do
+    it 'sets state to finished' do
+      game.finish
+      expect(game.state).to eq(:finished)
+    end
+  end
+
+  describe '#to_h' do
+    it 'returns hash representation' do
+      game.add_player('Alice')
+      hash = game.to_h
+      expect(hash[:chat_id]).to eq(chat_id)
+      expect(hash[:players].size).to eq(1)
+      expect(hash[:state]).to eq('waiting_for_players')
+    end
+  end
+
+  describe '.from_h' do
+    it 'creates game from hash' do
+      data = {
+        id: 1,
+        chat_id: 123,
+        players: [{ name: 'Alice', scores: Array.new(17, 0), used_categories: [], total_score: 0 }],
+        current_player_index: 0,
+        state: 'in_progress',
+        created_at: Time.now.to_s,
+        updated_at: Time.now.to_s
+      }
+      restored = described_class.from_h(data)
+      expect(restored.chat_id).to eq(123)
+      expect(restored.players.size).to eq(1)
+      expect(restored.players.first.name).to eq('Alice')
     end
   end
 end

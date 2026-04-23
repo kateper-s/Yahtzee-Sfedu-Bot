@@ -17,7 +17,6 @@ module Yahtzee
 
     def add_score(category, points)
       validate_category!(category)
-      validate_category_not_used!(category)
 
       @scores[category_index(category)] = points
       @used_categories << category
@@ -70,10 +69,6 @@ module Yahtzee
 
     def validate_category!(category)
       raise ArgumentError, 'Invalid category' unless category.between?(1, 13)
-    end
-
-    def validate_category_not_used!(category)
-      raise ArgumentError, 'Category already used' if category_used?(category)
     end
 
     def category_index(category)

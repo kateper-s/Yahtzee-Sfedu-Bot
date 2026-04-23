@@ -14,8 +14,10 @@ require 'factory_bot'
 require 'faker'
 require 'timecop'
 require 'webmock/rspec'
-require 'database_cleaner-sequel'
 require 'pry'
+
+# DatabaseCleaner полностью отключен - закомментирован
+# require 'database_cleaner-sequel'
 
 require_relative '../lib/yahtzee/game'
 require_relative '../lib/yahtzee/player'
@@ -30,13 +32,14 @@ RSpec.configure do |config|
     FactoryBot.find_definitions
   end
 
-  config.before do
-    DatabaseCleaner.strategy = :transaction
-    DatabaseCleaner.start
-  end
+  # DatabaseCleaner полностью отключен
+  # config.before do
+  #   DatabaseCleaner.strategy = :transaction
+  #   DatabaseCleaner.start
+  # end
 
   config.after do
-    DatabaseCleaner.clean
+    # DatabaseCleaner.clean
     Timecop.return
   end
 
@@ -52,7 +55,7 @@ RSpec.configure do |config|
   config.filter_run_when_matching :focus
   config.example_status_persistence_file_path = 'spec/examples.txt'
   config.disable_monkey_patching!
-  config.warnings = true
+  config.warnings = false  # Отключаем warnings для чистоты вывода
   config.default_formatter = 'doc' if config.files_to_run.one?
   config.order = :random
   Kernel.srand config.seed

@@ -2,7 +2,7 @@
 
 source 'https://rubygems.org'
 
-ruby '3.3.6'
+ruby '>= 3.3.6', '< 3.4'
 
 gem 'dotenv', '~> 2.8'
 gem 'json', '~> 2.6'
