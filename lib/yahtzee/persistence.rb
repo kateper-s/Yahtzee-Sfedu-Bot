@@ -89,7 +89,6 @@ module Yahtzee
         DateTime :updated_at, default: Sequel::CURRENT_TIMESTAMP
       end
 
-      # Безопасное добавление индекса (исправление ошибки)
       existing_index = @db.indexes(:games).values.any? { |idx| idx[:columns] == [:chat_id] }
       unless existing_index
         @db.add_index :games, :chat_id, unique: true
@@ -97,14 +96,13 @@ module Yahtzee
 
       @db.create_table? :player_stats do
         primary_key :id
-        Integer :user_id # Telegram ID пользователя
+        Integer :user_id
         String :player_name, null: false
         Integer :score, null: false
         Integer :won, default: 0
         DateTime :played_at, default: Sequel::CURRENT_TIMESTAMP
       end
 
-      # Миграция: добавить колонку user_id, если её нет (для старых БД)
       return if @db.schema(:player_stats).any? { |col| col.first == :user_id }
 
       @db.alter_table(:player_stats) do

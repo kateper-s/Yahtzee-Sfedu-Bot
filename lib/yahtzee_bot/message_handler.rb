@@ -67,7 +67,7 @@ module YahtzeeBot
           stop_game(bot, chat_id, game, persistence, callback)
         when 'main_menu'
           show_main_menu(bot, chat_id, game, callback)
-        when 'main_menu_root' # новый callback для выхода в корневое меню без игры
+        when 'main_menu_root'
           show_main_menu(bot, chat_id, nil, callback)
         when 'reroll_start'
           show_reroll_selection(bot, chat_id, game, callback)

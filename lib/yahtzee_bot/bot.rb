@@ -45,7 +45,6 @@ module YahtzeeBot
 
       result = MessageHandler.handle(bot, message, @games[chat_id], @persistence)
 
-      # Обновляем игру в памяти, если результат - игра
       return unless result.is_a?(Yahtzee::Game)
 
       @games[chat_id] = result
@@ -62,7 +61,6 @@ module YahtzeeBot
       result = MessageHandler.handle_callback(bot, callback, @games[chat_id], @persistence)
       puts "handle_callback вернул #{result.class}, object_id=#{result&.object_id}"
 
-      # Обновляем игру в памяти, если результат - игра
       if result.is_a?(Yahtzee::Game)
         @games[chat_id] = result
         save_game(chat_id)
