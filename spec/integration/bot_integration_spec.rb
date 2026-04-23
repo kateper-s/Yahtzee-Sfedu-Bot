@@ -74,13 +74,13 @@ RSpec.describe 'YahtzeeBot Integration' do
     it 'handles invalid commands gracefully' do
       bot_instance = YahtzeeBot::Bot.new
 
-      # Создаем сообщение с неизвестной командой
       unknown_message = double('Telegram::Bot::Types::Message',
                                text: '/unknown_command',
                                chat: double('Telegram::Bot::Types::Chat', id: chat_id),
                                from: double('Telegram::Bot::Types::User', id: 789, first_name: 'Alice'))
 
       bot_instance.send(:handle_message, bot, unknown_message)
+      expect { bot_instance.send(:handle_message, bot, unknown_message) }.not_to raise_error
     end
 
     it 'prevents actions when game not started' do

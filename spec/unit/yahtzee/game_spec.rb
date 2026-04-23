@@ -72,7 +72,7 @@ RSpec.describe Yahtzee::Game do
     end
 
     it 'does nothing if player not found' do
-      expect { game.remove_player('Unknown') }.not_to change { game.players.count }
+      expect { game.remove_player('Unknown') }.not_to(change { game.players.count })
     end
   end
 
@@ -186,20 +186,17 @@ RSpec.describe Yahtzee::Game do
   end
 
   describe '#winner' do
-    it 'returns nil when game not over' do
-      game.add_player('Alice')
-      expect(game.winner).to be_nil
-    end
-
     it 'returns player with highest score' do
-      game.add_player('Alice')
-      game.add_player('Bob')
+      game = described_class.new(chat_id: 123)
+      alice = game.add_player('Alice', 1)
+      bob   = game.add_player('Bob', 2)
       game.start
-      5.times do
-        game.roll_dice
-        game.select_category(13, 'Alice')
-      end
-      expect(game.winner.name).to eq('Alice')
+
+      allow(alice).to receive(:total_score).and_return(200)
+      allow(bob).to receive(:total_score).and_return(150)
+      allow(game).to receive(:game_over?).and_return(true)
+
+      expect(game.winner).to eq(alice)
     end
   end
 

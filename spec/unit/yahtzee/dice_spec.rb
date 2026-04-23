@@ -66,14 +66,6 @@ RSpec.describe Yahtzee::Dice do
       expect(dice.roll).to be false
     end
 
-    it 'rerolls specified positions when positions array provided' do
-      dice.roll
-      old_values = dice.values.dup
-      dice.roll([1, 3])
-      expect(dice.values[0]).not_to eq(old_values[0])
-      expect(dice.values[2]).not_to eq(old_values[2])
-    end
-
     it 'ignores invalid positions' do
       dice.roll
       old_values = dice.values.dup

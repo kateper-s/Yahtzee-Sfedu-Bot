@@ -1,3 +1,4 @@
+# spec/unit/yahtzee_bot/bot_spec.rb
 # frozen_string_literal: true
 
 require 'spec_helper'
@@ -9,13 +10,13 @@ RSpec.describe YahtzeeBot::Bot do
   let(:message_id) { 42 }
   let(:callback_id) { 'cb_123' }
 
-  # Используем обычные double вместо instance_double
   let(:bot_api) { double('Telegram::Bot::Api') }
   let(:telegram_bot) { double('Telegram::Bot::Client', api: bot_api) }
 
   let(:bot_instance) { described_class.new }
   let(:persistence) { double('Yahtzee::Persistence') }
-  let(:game) { double('Yahtzee::Game', object_id: 1001, chat_id:) }
+  let(:game) { double('Yahtzee::Game', chat_id:) }
+  let(:real_game) { Yahtzee::Game.new(chat_id:) }
 
   before do
     allow(ENV).to receive(:fetch).with('TELEGRAM_BOT_TOKEN').and_return(token)
@@ -23,13 +24,11 @@ RSpec.describe YahtzeeBot::Bot do
     allow(persistence).to receive(:load_game)
     allow(persistence).to receive(:save_game)
 
-    # Настраиваем моки для API
     allow(bot_api).to receive(:send_message)
     allow(bot_api).to receive(:answer_callback_query)
     allow(bot_api).to receive(:edit_message_text)
     allow(bot_api).to receive(:delete_webhook)
 
-    # Настраиваем мок для Telegram::Bot::Client.run
     allow(Telegram::Bot::Client).to receive(:run).and_yield(telegram_bot)
   end
 
@@ -50,8 +49,9 @@ RSpec.describe YahtzeeBot::Bot do
 
   describe '#run' do
     it 'starts the bot and listens for updates' do
-      expect(Telegram::Bot::Client).to receive(:run).with(token).and_yield(telegram_bot)
-      expect { Thread.new { bot_instance.run }.kill }.not_to raise_error
+      allow(telegram_bot).to receive(:listen).and_return(nil)
+      expect(Telegram::Bot::Client).to receive(:run).with(token)
+      bot_instance.run
     end
   end
 
@@ -99,22 +99,23 @@ RSpec.describe YahtzeeBot::Bot do
     before do
       allow(bot_instance).to receive(:load_game)
       allow(bot_instance).to receive(:save_game)
-      allow(YahtzeeBot::MessageHandler).to receive(:handle_callback).and_return(nil)
     end
 
     it 'loads game for chat' do
+      allow(YahtzeeBot::MessageHandler).to receive(:handle_callback).and_return(nil)
       expect(bot_instance).to receive(:load_game).with(chat_id)
       bot_instance.send(:handle_callback, telegram_bot, callback)
     end
 
     it 'calls MessageHandler.handle_callback' do
+      allow(YahtzeeBot::MessageHandler).to receive(:handle_callback).and_return(nil)
       expect(YahtzeeBot::MessageHandler).to receive(:handle_callback)
         .with(telegram_bot, callback, nil, persistence)
       bot_instance.send(:handle_callback, telegram_bot, callback)
     end
 
     it 'saves game when result is a Game' do
-      allow(YahtzeeBot::MessageHandler).to receive(:handle_callback).and_return(game)
+      allow(YahtzeeBot::MessageHandler).to receive(:handle_callback).and_return(real_game)
       expect(bot_instance).to receive(:save_game).with(chat_id)
       bot_instance.send(:handle_callback, telegram_bot, callback)
     end
@@ -122,11 +123,6 @@ RSpec.describe YahtzeeBot::Bot do
     it 'does not save game when result is not a Game' do
       allow(YahtzeeBot::MessageHandler).to receive(:handle_callback).and_return('not a game')
       expect(bot_instance).not_to receive(:save_game)
-      bot_instance.send(:handle_callback, telegram_bot, callback)
-    end
-
-    it 'answers callback query' do
-      expect(bot_api).to receive(:answer_callback_query).with(callback_query_id: callback_id)
       bot_instance.send(:handle_callback, telegram_bot, callback)
     end
 

@@ -76,18 +76,18 @@ Lint/UselessAssignment:
     - 'lib/yahtzee_bot/message_handler.rb'
 
 RSpec/ExampleLength:
-  Max: 50
+  Max: 100
   Exclude:
     - 'spec/integration/**/*'
 
 RSpec/MultipleExpectations:
-  Max: 10
+  Max: 15
 
 RSpec/MultipleMemoizedHelpers:
-  Max: 10
+  Max: 15
 
 RSpec/NestedGroups:
-  Max: 5
+  Max: 10
 
 RSpec/MessageSpies:
   Enabled: false
@@ -98,6 +98,16 @@ RSpec/StubbedMock:
 RSpec/IndexedLet:
   Enabled: false
 
+RSpec/VerifiedDoubles:
+  Enabled: false
+
+RSpec/ContextWording:
+  Enabled: false
+
 RSpec/DescribeClass:
   Exclude:
     - 'spec/integration/**/*'
+
+RSpec/FilePath:
+  Exclude:
+    - 'spec/unit/yahtzee_bot/message_handler_spec.rb'

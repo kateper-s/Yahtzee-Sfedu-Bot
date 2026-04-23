@@ -113,7 +113,7 @@ module YahtzeeBot
         )
       end
 
-      def show_main_menu(bot, chat_id, game = nil, callback = nil)
+      def show_main_menu(bot, chat_id, game = nil, _callback = nil)
         if game && game.state == :in_progress
           if game.dice.rolled?
             keyboard = roll_keyboard(game.dice.rolls_left)
@@ -130,21 +130,12 @@ module YahtzeeBot
           text = "🏠 Главное меню\nВыберите действие:"
         end
 
-        if callback
-          bot.api.send_message(
-            chat_id:,
-            text:,
-            reply_markup: keyboard,
-            parse_mode: 'Markdown'
-          )
-        else
-          bot.api.send_message(
-            chat_id:,
-            text:,
-            reply_markup: keyboard,
-            parse_mode: 'Markdown'
-          )
-        end
+        bot.api.send_message(
+          chat_id:,
+          text:,
+          reply_markup: keyboard,
+          parse_mode: 'Markdown'
+        )
         bot.api.send_message(
           chat_id:,
           text:,
@@ -402,7 +393,6 @@ module YahtzeeBot
         selected = callback.message.reply_markup.inline_keyboard[0]
                            .filter_map { |btn| btn.callback_data.match(/reroll_toggle_(\d+)/) { |m| m[1].to_i } if btn.text.include?('✅') }
 
-
         if selected.include?(position)
           selected.delete(position)
         else
@@ -428,7 +418,6 @@ module YahtzeeBot
 
         selected = callback.message.reply_markup.inline_keyboard[0]
                            .filter_map { |btn| btn.callback_data.match(/reroll_toggle_(\d+)/) { |m| m[1].to_i } if btn.text.include?('✅') }
-
 
         if selected.empty?
           bot.api.answer_callback_query(
