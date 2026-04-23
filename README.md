@@ -64,4 +64,4 @@ gem install telegram-bot-ruby
 TOKEN = '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz'
 
 5. **Запустите бота:**
-ruby yahtzee_bot.rb
+ruby bot.rb
